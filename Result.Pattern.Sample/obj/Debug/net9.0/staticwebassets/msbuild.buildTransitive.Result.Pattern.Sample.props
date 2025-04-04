@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../buildMultiTargeting/Result.Pattern.Sample.props" />
-</Project>
