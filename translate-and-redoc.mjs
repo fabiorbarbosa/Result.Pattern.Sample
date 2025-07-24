@@ -5,13 +5,23 @@ import translate from "google-translate-api-x";
 import { execSync } from "child_process";
 
 const SEP = "|||<SEP>|||";
+const CHUNK_SIZE = 100; // Ajuste aqui para outros tamanhos de lote
 
-// 1. Busca todos os YAML/YML (menos os já traduzidos)
+// Busca todos os YAML/YML (exceto os já traduzidos)
 const files = globSync("*.yml")
   .concat(globSync("*.yaml"))
   .filter((f) => !f.endsWith(".en.yaml") && !f.endsWith(".en.yml"));
 
-// 2. Funções auxiliares
+// Função para dividir array em lotes (chunks)
+function chunkArray(arr, chunkSize) {
+  const chunks = [];
+  for (let i = 0; i < arr.length; i += chunkSize) {
+    chunks.push(arr.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
+// Funções auxiliares
 function extractStrings(obj, arr = [], path = []) {
   for (const key in obj) {
     if (typeof obj[key] === "string") {
@@ -29,22 +39,34 @@ function setByPath(obj, path, value) {
   temp[last] = value;
 }
 
-// 3. Traduz e salva
+// Traduz e salva
 for (const file of files) {
   const doc = YAML.load(file);
   const stringsToTranslate = extractStrings(doc);
   if (stringsToTranslate.length === 0) continue;
 
-  const batchText = stringsToTranslate.map((item) => item.value).join(SEP);
-  console.log(`Traduzindo: ${file}`);
-  let translatedText;
-  try {
-    translatedText = (await translate(batchText, { to: "en" })).text;
-  } catch (e) {
-    console.error(`Erro ao traduzir ${file}:`, e.message);
-    continue;
+  // Paginando a tradução em lotes
+  const chunks = chunkArray(stringsToTranslate, CHUNK_SIZE);
+  let translatedArray = [];
+  for (const chunk of chunks) {
+    const batchText = chunk.map((item) => item.value).join(SEP);
+    console.log(`Traduzindo ${chunk.length} textos do arquivo ${file}...`);
+    let translatedText = null;
+    try {
+      translatedText = (await translate(batchText, { to: "en" })).text;
+    } catch (e) {
+      console.error("Erro ao traduzir chunk:", e.message);
+      // Em caso de erro, coloca os originais no lugar
+      translatedText = chunk.map((item) => item.value).join(SEP);
+    }
+    if (typeof translatedText !== "string") {
+      console.error("Tradução retornou nulo! Usando texto original.");
+      translatedArray = translatedArray.concat(chunk.map((item) => item.value));
+    } else {
+      translatedArray = translatedArray.concat(translatedText.split(SEP));
+    }
   }
-  const translatedArray = translatedText.split(SEP);
+
   stringsToTranslate.forEach((item, i) =>
     setByPath(doc, [...item.path], translatedArray[i])
   );
@@ -55,13 +77,13 @@ for (const file of files) {
   console.log(`Arquivo traduzido: ${outName}`);
 }
 
-// 4. Gera HTML com o Redocly CLI
+// Gera HTML com o Redocly CLI
 const allYamlFiles = globSync("*.yml").concat(globSync("*.yaml"));
 for (const yaml of allYamlFiles) {
   const htmlName = yaml.replace(/\.ya?ml$/, ".html");
   try {
     console.log(`Gerando HTML: ${htmlName}`);
-    execSync(`redocly build-docs "${yaml}" -o "${htmlName}"`);
+    execSync(`npx redocly build-docs "${yaml}" -o "${htmlName}"`);
   } catch (e) {
     console.error(`Erro ao gerar o HTML para ${yaml}:`, e.message);
   }
