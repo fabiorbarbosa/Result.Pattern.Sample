@@ -10,7 +10,7 @@ This project is an example implementation of a result pattern in ASP.NET Core AP
 
 - **Example Endpoints**:
   - `GET /weatherforecast`: Returns a list of weather forecasts.
-  - `GET /weatherforecast/{id}`: Returns a specific forecast or `NotFound` if the ID does not exist.
+  - `GET /weatherforecast/{name}`: Returns a specific forecast or `NotFound` if the NAME does not exist.
 
 ## Project Structure
 
@@ -42,7 +42,7 @@ This project is an example implementation of a result pattern in ASP.NET Core AP
    ```
 5. Access the endpoints in your browser or an HTTP client:
    - `http://localhost:5100/weatherforecast`
-   - `http://localhost:5100/weatherforecast/{id}`
+   - `http://localhost:5100/weatherforecast/{name}`
 
 ## Testing
 
