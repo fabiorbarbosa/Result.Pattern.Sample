@@ -5,8 +5,17 @@ using Result.Pattern.Sample.Results;
 
 namespace Result.Pattern.Sample.Extensions;
 
+/// <summary>
+/// Extension methods for the Result class.
+/// </summary>
 public static class ResultExtension
 {
+    /// <summary>
+    /// Converts a Result object to an ObjectResult.
+    /// </summary>
+    /// <typeparam name="T">The type of the value returned on success.</typeparam>
+    /// <param name="result">The Result object to convert.</param>
+    /// <returns>An ObjectResult based on the result type.</returns>
     public static ObjectResult ToObjectResult<T>(this Result<T> result)
         => result.Type switch
         {
@@ -20,7 +29,7 @@ public static class ResultExtension
                 => new CreatedAtActionResult(result.ActionName, null, result.RouteValues, result.Value),
 
             ResultType.NoContent
-                => new ObjectResult(null) { StatusCode = 204 },
+                => new NoContentResult(),
 
             ResultType.Failure
                 => new ObjectResult(new { errors = result.Errors }) { StatusCode = 500 },
@@ -39,4 +48,54 @@ public static class ResultExtension
 
             _ => new ObjectResult(result.Value) { StatusCode = (int?)(result.StatusCode ?? HttpStatusCode.OK) }
         };
+
+    /// <summary>
+    /// Executes an action if the result is successful.
+    /// </summary>
+    /// <typeparam name="T">The type of the value returned on success.</typeparam>
+    /// <param name="result">The Result object to execute the action on.</param>
+    /// <param name="action">The action to execute if the result is successful.</param>
+    /// <param name="logger">The logger to use for logging errors.</param>
+    /// <returns>The Result object.</returns>
+    public static Result<T> OnSuccess<T>(this Result<T> result, Action<T> action, ILogger? logger = default)
+    {
+        if (result.IsSuccess && result.Value is not null)
+        {
+            try
+            {
+                action(result.Value);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogError(ex, "Error executing success action.");
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Executes an action if the result is not successful.
+    /// </summary>
+    /// <typeparam name="T">The type of the value returned on success.</typeparam>
+    /// <param name="result">The Result object to execute the action on.</param>
+    /// <param name="action">The action to execute if the result is not successful.</param>
+    /// <param name="logger">The logger to use for logging errors.</param>
+    /// <returns>The Result object.</returns>
+    public static Result<T> OnFailure<T>(this Result<T> result, Action<T> action, ILogger? logger = default)
+    {
+        if (!result.IsSuccess && result.Errors is not null)
+        {
+            try
+            {
+                action(result.Value);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogError(ex, "Error executing error action.");
+            }
+        }
+
+        return result;
+    }
 }
